@@ -1,0 +1,9 @@
+/target
+*.flac
+*.m4a
+*.txt
+*.jpg
+.tdlrs.json
+.vscode
+*.bak
+download_*
