@@ -1,3 +1,4 @@
+mod config;
 mod constants;
 mod download;
 mod download_parallel;
@@ -33,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .unwrap();
     let mut client = TidalClient::new(token);
-    client.get_device_code("zU4XHVVkc2tDPo4t".to_string()).await;
+    client.get_session("zU4XHVVkc2tDPo4t".to_string()).await;
     client.login_session().await;
     client.save_token().await;
     for i in 1..args.len() {

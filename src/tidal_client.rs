@@ -1,5 +1,6 @@
 use std::{fs, path::Path, process::exit, thread, time::Duration};
 
+use crate::config::*;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client, Response,
@@ -12,6 +13,7 @@ use crate::constants::{TIDAL_AUTH_LINK, TIDAL_BASE, USER_AGENT};
 pub struct TidalClient {
     pub device_code: DeviceCode,
     pub user_info: UserInfo,
+    pub config: Config,
     pub have_userinfo: bool,
 }
 #[derive(Debug, Default)]
@@ -31,17 +33,19 @@ pub struct DeviceCode {
 }
 
 impl TidalClient {
-    pub fn new(user_info: Option<UserInfo>) -> TidalClient {
+    pub fn new(user_info: Option<(UserInfo, Config)>) -> TidalClient {
         match user_info {
-            Some(user_info) => TidalClient {
+            Some((user_info)) => TidalClient {
                 device_code: DeviceCode::default(),
-                user_info: user_info,
+                user_info: user_info.0,
                 have_userinfo: true,
+                config: user_info.1
             },
             None => TidalClient {
                 device_code: DeviceCode::default(),
                 user_info: UserInfo::default(),
                 have_userinfo: false,
+                config: Config::new()
             },
         }
     }
@@ -49,7 +53,7 @@ impl TidalClient {
     //pub async fn login() {}
 
     //id == client_id
-    pub async fn get_device_code(&mut self, id: String) {
+    pub async fn get_session(&mut self, id: String) {
         if self.have_userinfo {
             println!("Session exists!\nSkip login..");
             return;
@@ -189,26 +193,36 @@ impl TidalClient {
             .append(false)
             .open(".tdlrs.json")
             .expect("failed to read file");
-        let json = json!({
+            // TODO: Implement enum to some T to write json properly
+            let json = json!({
             "access_token": self.user_info.access_token,
             "expires_in": self.user_info.expires_in,
             "country_code": self.user_info.country_code,
             "user_id": self.user_info.user_id,
             "refresh_token": self.user_info.refresh_token,
+            "download_quality": self.config.download_path,
+            "audio_quality": self.config.audio_quality,
+            "save_cover": self.config.save_cover,
+            "cover_size": self.config.cover_size,
+            "exist_check": self.config.exist_check,
         });
 
         serde_json::to_writer_pretty(&file, &json).unwrap();
     }
 }
-pub async fn get_token() -> Option<UserInfo> {
+pub async fn get_token() -> Option<(UserInfo, Config)> {
     let exist = Path::new(".tdlrs.json").exists();
     if !exist {
         //fs::File::create(".tdlrs.json").expect("failed to create file");
         return None;
     }
     //let file = fs::File::open(".tdlrs.json").unwrap();
-    let json: Value =
-        serde_json::from_str(fs::read_to_string(".tdlrs.json").unwrap().as_str()).unwrap();
+    let json: Value = serde_json::from_str(
+        fs::read_to_string(".tdlrs.json")
+            .expect("cannot open .tdlrs.json!")
+            .as_str(),
+    )
+    .expect("cannot parse json");
     let user_info = UserInfo {
         access_token: json
             .get("access_token")
@@ -236,7 +250,38 @@ pub async fn get_token() -> Option<UserInfo> {
             .unwrap()
             .to_string(),
     };
-    Some(user_info)
+    let config = Config {
+        download_path: json.get("download_path").unwrap().as_str().unwrap()
+        ,audio_quality: json
+        .get("audio_quality")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string(),
+
+        save_cover: json
+        .get("save_cover")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .trim().parse::<bool>().unwrap(),
+
+        cover_size: json
+        .get("cover_size")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string(),
+
+        exist_check: json
+        .get("exist_check")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string().trim().parse::<bool>().unwrap(),
+
+    }
+    Some((user_info, config))
 }
 
 pub fn remove_non_alphanumeric(s: String) -> String {
