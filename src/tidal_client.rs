@@ -203,7 +203,6 @@ impl TidalClient {
             "download_path": self.config.download_path,
             "audio_quality": self.config.audio_quality,
             "save_cover": self.config.save_cover.to_string(),
-            "cover_size": self.config.cover_size,
             "exist_check": self.config.exist_check.to_string(),
         });
 
@@ -272,13 +271,6 @@ pub async fn get_token() -> Option<(UserInfo, Config)> {
             .unwrap()
             .trim()
             .parse::<bool>()
-            .unwrap(),
-        cover_size: json
-            .get("cover_size")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .parse::<CoverSize>()
             .unwrap(),
         exist_check: json
             .get("exist_check")

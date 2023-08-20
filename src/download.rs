@@ -1,9 +1,8 @@
 use std::{
     cmp::min,
-    default, fs,
+    fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
-    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -11,6 +10,7 @@ use crate::constants::*;
 use base64::Engine;
 use futures::{stream, Future, StreamExt};
 use http::{HeaderMap, HeaderValue};
+use image::ImageBuffer;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use lofty::{Accessor, PictureType, Probe, Tag, TagExt, TaggedFileExt, TagType};
 use reqwest::{Client, Url};
@@ -144,6 +144,7 @@ pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type:
             let client = client.clone();
             let pb = m.add(ProgressBar::new(0));
             let mut dl_path = dl_path.clone();
+            let save_cover = t_client.config.save_cover;
             tokio::spawn(async move {
                 let resp = client.get(url.clone()).send().await.unwrap();
                 pb.set_length(
@@ -179,7 +180,7 @@ pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type:
                     pb.set_position(new);
                 }
                 pb.set_message("Writing ID3");
-                write_metadata(&c[i], client, dl_path).await;
+                write_metadata(&c[i], client, dl_path, save_cover).await;
                 pb.finish_with_message(format!("Downloaded"));
             })
         })
@@ -210,7 +211,7 @@ pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type:
     */
 }
 
-pub async fn write_metadata(track: &TrackInfo, request: Client, path_str: String) {
+pub async fn write_metadata(track: &TrackInfo, request: Client, path_str: String, save_cover: bool) {
     let cover_url = format!(
         "https://resources.tidal.com/images/{}/1280x1280.jpg",
         track.cover_id
@@ -224,9 +225,19 @@ pub async fn write_metadata(track: &TrackInfo, request: Client, path_str: String
         .bytes()
         .await
         .unwrap();
+
+        let path = Path::new(path_str.as_str());
+        let mut parent_path = PathBuf::from(path.parent().unwrap());
+    if save_cover {
+        parent_path.push("cover.jpg");
+        if !parent_path.exists() {
+            let mut f = File::create(parent_path).expect("Failed to create cover.jpg");
+            f.write_all(&cover).expect("failed to write cover.jpg");
+        }
+        
+    }
     //head > title
         //println!("tag: {}", file_name);
-    let path = Path::new(path_str.as_str());
     //eprintln!("{}", path_str);
     let mut tagged_file = Probe::open(&path).unwrap().read().unwrap();
     let tag = match tagged_file.primary_tag_mut() {
