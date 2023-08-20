@@ -239,7 +239,7 @@ pub async fn write_metadata(track: &TrackInfo, request: Client, path_str: String
                 //println!("{}:{:?}", path_str, first_tag.tag_type());
                 first_tag
             } else {
-                let mut tag_type = tagged_file.primary_tag_type();
+                let tag_type = tagged_file.primary_tag_type();
                 //eprintln!("WARN: No tags found, creating a new tag of type `{tag_type:?}`");
                 tagged_file.insert_tag(Tag::new(tag_type));
 

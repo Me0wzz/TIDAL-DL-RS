@@ -39,13 +39,13 @@ impl TidalClient {
                 device_code: DeviceCode::default(),
                 user_info: user_info.0,
                 have_userinfo: true,
-                config: user_info.1
+                config: user_info.1,
             },
             None => TidalClient {
                 device_code: DeviceCode::default(),
                 user_info: UserInfo::default(),
                 have_userinfo: false,
-                config: Config::new()
+                config: Config::new(),
             },
         }
     }
@@ -106,9 +106,8 @@ impl TidalClient {
                 .check_auth_token(client.clone(), payload_d2.clone())
                 .await;
             if a != 200 {
-                println!("Waiting... [{}]", self.device_code.user_code);
-                thread::sleep(Duration::from_millis(10000));
-                elapsed += 10;
+                thread::sleep(Duration::from_millis(1000));
+                elapsed += 1;
                 continue;
             } else {
                 println!("Connected Tidal successfully");
@@ -193,18 +192,18 @@ impl TidalClient {
             .append(false)
             .open(".tdlrs.json")
             .expect("failed to read file");
-            // TODO: Implement enum to some T to write json properly
-            let json = json!({
+        // TODO: Implement enum to some T to write json properly
+        let json = json!({
             "access_token": self.user_info.access_token,
             "expires_in": self.user_info.expires_in,
             "country_code": self.user_info.country_code,
             "user_id": self.user_info.user_id,
             "refresh_token": self.user_info.refresh_token,
-            "download_quality": self.config.download_path,
+            "download_path": self.config.download_path,
             "audio_quality": self.config.audio_quality,
-            "save_cover": self.config.save_cover,
+            "save_cover": self.config.save_cover.to_string(),
             "cover_size": self.config.cover_size,
-            "exist_check": self.config.exist_check,
+            "exist_check": self.config.exist_check.to_string(),
         });
 
         serde_json::to_writer_pretty(&file, &json).unwrap();
@@ -251,36 +250,45 @@ pub async fn get_token() -> Option<(UserInfo, Config)> {
             .to_string(),
     };
     let config = Config {
-        download_path: json.get("download_path").unwrap().as_str().unwrap()
-        ,audio_quality: json
-        .get("audio_quality")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string(),
-
+        download_path: json
+            .get("download_path")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string(),
+        audio_quality: json
+            .get("audio_quality")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string()
+            .parse::<AudioQuality>()
+            .unwrap(),
         save_cover: json
-        .get("save_cover")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .trim().parse::<bool>().unwrap(),
-
+            .get("save_cover")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .trim()
+            .parse::<bool>()
+            .unwrap(),
         cover_size: json
-        .get("cover_size")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string(),
-
+            .get("cover_size")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .parse::<CoverSize>()
+            .unwrap(),
         exist_check: json
-        .get("exist_check")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string().trim().parse::<bool>().unwrap(),
-
-    }
+            .get("exist_check")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string()
+            .trim()
+            .parse::<bool>()
+            .unwrap(),
+    };
     Some((user_info, config))
 }
 
