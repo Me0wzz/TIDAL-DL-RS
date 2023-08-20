@@ -10,7 +10,6 @@ use crate::constants::*;
 use base64::Engine;
 use futures::{stream, Future, StreamExt};
 use http::{HeaderMap, HeaderValue};
-use image::ImageBuffer;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use lofty::{Accessor, PictureType, Probe, Tag, TagExt, TaggedFileExt, TagType};
 use reqwest::{Client, Url};
@@ -139,12 +138,13 @@ pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type:
     let client = Client::new();
     let m = MultiProgress::new();
     let bodies = futures::stream::iter(urls).enumerate()
-        .map(|(i,(url, file_name))| {
+        .map(|(i,(url, file_name))| -> task::JoinHandle<()> {
             let c = tracks.to_vec();
             let client = client.clone();
             let pb = m.add(ProgressBar::new(0));
             let mut dl_path = dl_path.clone();
             let save_cover = t_client.config.save_cover;
+            let exist_check = t_client.config.exist_check;
             tokio::spawn(async move {
                 let resp = client.get(url.clone()).send().await.unwrap();
                 pb.set_length(
@@ -164,6 +164,15 @@ pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type:
                 fs::create_dir_all(dl_path.clone()).unwrap();
                 dl_path = format!("{}/{}",dl_path,file_name);
                 pb.set_message(file_name);
+                if exist_check {
+                let file_exist = Path::new(&dl_path).exists();
+                
+                if file_exist  {
+                    pb.set_position(100);
+                    pb.finish_with_message("File already exists! Skip downloading..");
+                    return ;
+                }
+            }
                 let mut file = std::fs::File::create(dl_path.clone())
                     .or(Err(format!("Failed to create file '")))
                     .unwrap();
