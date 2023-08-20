@@ -104,20 +104,20 @@ pub async fn get_tracks_from_id(
             track_id,
             audio_quality,
         })
-    }let mut dir_path = String::new();
+    }let mut dl_path: String = t_client.config.download_path.clone();
     if *url_type == UrlType::Playlist {
         let url = reqwest::Url::parse_with_params(format!("{}/playlists/{}", TIDAL_BASE, id).as_str(), params).unwrap();
         let resp = r_client.get(url).headers(header).send().await.unwrap();
         let title = resp.json::<serde_json::Value>().await.unwrap().get("title").unwrap().as_str().unwrap().to_string();
-        dir_path.push_str(format!("Playlist/{}",title).as_str());
+        dl_path.push_str(format!("Playlist/{}",title).as_str());
     } else {
-        dir_path.push_str(format!("Album/{}/{}", v[0].artist, v[0].album).as_str())
+        dl_path.push_str(format!("Album/{}/{}", v[0].artist, v[0].album).as_str())
     }
     //println!("{}", v.len());
-    (v, dir_path)
+    (v, dl_path)
 }
 
-pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type: &UrlType, dir_path: String) {
+pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type: &UrlType, dl_path: String) {
     let a = tracks.len();
     let params = [
         ("audioquality", "HI_RES"),
@@ -143,7 +143,7 @@ pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type:
             let c = tracks.to_vec();
             let client = client.clone();
             let pb = m.add(ProgressBar::new(0));
-            let dir_path = dir_path.clone();
+            let mut dl_path = dl_path.clone();
             tokio::spawn(async move {
                 let resp = client.get(url.clone()).send().await.unwrap();
                 pb.set_length(
@@ -160,10 +160,10 @@ pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type:
                 
                 let total_size = resp.content_length().unwrap();
                 let mut stream = resp.bytes_stream();
-                fs::create_dir_all(dir_path.clone()).unwrap();
-                let f_string = format!("{}/{}",dir_path,file_name);
+                fs::create_dir_all(dl_path.clone()).unwrap();
+                dl_path = format!("{}/{}",dl_path,file_name);
                 pb.set_message(file_name);
-                let mut file = std::fs::File::create(f_string.clone())
+                let mut file = std::fs::File::create(dl_path.clone())
                     .or(Err(format!("Failed to create file '")))
                     .unwrap();
                 let mut downloaded: u64 = 0;
@@ -179,7 +179,7 @@ pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type:
                     pb.set_position(new);
                 }
                 pb.set_message("Writing ID3");
-                write_metadata(&c[i], client, f_string).await;
+                write_metadata(&c[i], client, dl_path).await;
                 pb.finish_with_message(format!("Downloaded"));
             })
         })

@@ -56,6 +56,7 @@ impl TidalClient {
     pub async fn get_session(&mut self, id: String) {
         if self.have_userinfo {
             println!("Session exists!\nSkip login..");
+            println!("{:?}", self);
             return;
         }
         let mut header: HeaderMap = HeaderMap::new();
