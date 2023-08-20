@@ -10,7 +10,7 @@ impl Config {
     pub fn new() -> Config {
         Config {
             download_path: String::from("./"),
-            audio_quality: AudioQuality::High,
+            audio_quality: AudioQuality::LOSSLESS,
             save_cover: true,
             exist_check: true,
         }
@@ -19,18 +19,20 @@ impl Config {
 
 #[derive(Debug, serde_derive::Serialize, serde_derive::Deserialize)]
 pub enum AudioQuality {
-    Normal,
-    High,
-    Master,
+    LOW,
+    HIGH,
+    LOSSLESS,
+    MASTER,
 }
 
 impl std::str::FromStr for AudioQuality {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Normal" => Ok(AudioQuality::Normal),
-            "High" => Ok(AudioQuality::High),
-            "Master" => Ok(AudioQuality::Master),
+            "LOW" => Ok(AudioQuality::LOW),
+            "HIGH" => Ok(AudioQuality::HIGH),
+            "LOSSLESS" => Ok(AudioQuality::LOSSLESS),
+            "MASTER" => Ok(AudioQuality::MASTER),
             _ => Err(format!("invalid AudioQuality enum type: {}", s)),
         }
     }

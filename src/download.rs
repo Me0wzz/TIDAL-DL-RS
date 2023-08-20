@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::constants::*;
+use crate::{constants::*, config::AudioQuality};
 use base64::Engine;
 use futures::{stream, Future, StreamExt};
 use http::{HeaderMap, HeaderValue};
@@ -103,7 +103,7 @@ pub async fn get_tracks_from_id(
             track_id,
             audio_quality,
         })
-    }let mut dl_path: String = t_client.config.download_path.clone();
+    }let mut dl_path: String = t_client.config.download_path.clone() + "/";
     if *url_type == UrlType::Playlist {
         let url = reqwest::Url::parse_with_params(format!("{}/playlists/{}", TIDAL_BASE, id).as_str(), params).unwrap();
         let resp = r_client.get(url).headers(header).send().await.unwrap();
@@ -118,8 +118,14 @@ pub async fn get_tracks_from_id(
 
 pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type: &UrlType, dl_path: String) {
     let a = tracks.len();
+    let audio_quality = match t_client.config.audio_quality {
+        AudioQuality::LOW =>  "LOW",
+        AudioQuality::HIGH =>  "HIGH",
+        AudioQuality::LOSSLESS =>  "LOSSLESS",
+        AudioQuality::MASTER => "HI_RES"
+    };
     let params = [
-        ("audioquality", "HI_RES"),
+        ("audioquality", audio_quality),
         ("playbackmode", "STREAM"),
         ("assetpresentation", "FULL"),
         ("limit", "50"),
@@ -132,7 +138,7 @@ pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type:
     );
     let mut urls = vec![];
     for i in 0..tracks.len() {
-        let (url, file_name) = download_track(header.clone(), &params, tracks, i, &url_type).await;
+        let (url, file_name) = download_track(header.clone(), &params, tracks, i, &url_type, &audio_quality).await;
         urls.push((url, file_name));
     }
     let client = Client::new();
@@ -221,6 +227,7 @@ pub async fn download(t_client: &TidalClient, tracks: &Vec<TrackInfo>, url_type:
 }
 
 pub async fn write_metadata(track: &TrackInfo, request: Client, path_str: String, save_cover: bool) {
+    
     let cover_url = format!(
         "https://resources.tidal.com/images/{}/1280x1280.jpg",
         track.cover_id
@@ -244,6 +251,9 @@ pub async fn write_metadata(track: &TrackInfo, request: Client, path_str: String
             f.write_all(&cover).expect("failed to write cover.jpg");
         }
         
+    }
+    if path_str.ends_with(".mp4") {
+        return ;
     }
     //head > title
         //println!("tag: {}", file_name);
@@ -292,7 +302,8 @@ pub async fn download_track<'a>(
     param: &'a [(&'a str, &'a str)],
     tracks: &'a Vec<TrackInfo>,
     index: usize,
-    url_type: &UrlType
+    url_type: &UrlType,
+    audio_quality: &'a str
 ) -> (String, String) {
     let header_arc = Arc::new(Mutex::new(header));
     let len = tracks.len();
@@ -330,7 +341,7 @@ pub async fn download_track<'a>(
     let d_url = remove_non_alphanumeric(d_url);
     let mut file_name = format!("{} - {}.flac", tracks[index].artist, tracks[index].title);
 
-    if tracks[index].audio_quality.contains("HIGH") {
+    if audio_quality.contains("HIGH") || audio_quality.contains("LOW") {
         file_name = format!("{} - {}.mp4", tracks[index].artist, tracks[index].title)
     };
     let path = match url_type {
