@@ -1,6 +1,6 @@
 mod config;
 mod constants;
-mod download;git 
+mod download;
 mod tidal_client;
 
 use std::env;
